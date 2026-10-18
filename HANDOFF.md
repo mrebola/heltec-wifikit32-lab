@@ -112,12 +112,6 @@ que quieras. Mantener nunca dispara nada solo. No hay cinta de ayuda deslizante
   deauth contra la propia red, detección de "evil twin" (AP clon con mismo SSID),
   mapa de ocupación de canales.
 
-## Límites (importante)
-El usuario trabaja en seguridad. Mantener el alcance **defensivo y pasivo**: el
-radar solo escucha y lee cabeceras, nunca inyecta ni transmite tramas
-falsificadas. No construir ataques activos (p. ej. deauth/jamming) contra redes
-ajenas; eso queda fuera y no se implementa.
-
 ## Hardware opcional
 - Batería: Li-Po 1S 3.7 V con conector **JST 1.25mm / SH1.25** (verificar
   polaridad contra la serigrafía antes de conectar). 1000 mAh ≈ 6-7 h estimadas.
