@@ -7,8 +7,8 @@ de bolsillo:
 - Fija una red y estima a qué distancia está el router.
 - Indica si te estás **acercando**, **alejando** o si sigues **estable**.
 - Cuenta cuántos **equipos activos** hablan con ese router.
-- Se maneja con un solo botón (PRG), con una cinta de ayuda que siempre muestra
-  los controles.
+- Se maneja con un solo botón (PRG): mientras lo mantienes, la pantalla rota
+  las acciones posibles y dice qué pasará si sueltas en ese momento.
 
 > Cómo usarlo paso a paso: **[docs/operacion.md](docs/operacion.md)**.
 > Especificación técnica y decisiones: [docs/design.md](docs/design.md).
@@ -90,7 +90,7 @@ brew install platformio
 ### Compilar, probar y grabar
 ```sh
 cd radar-wifi
-pio test -e native            # 57 pruebas de la lógica, corren en la Mac
+pio test -e native            # 65 pruebas de la lógica, corren en la Mac
 pio run -e heltec             # compilar
 pio run -e heltec -t upload   # grabar la placa
 pio device monitor            # ver el log serie (115200)
@@ -106,8 +106,8 @@ radar-wifi/
 ├── platformio.ini          # env heltec (placa) + env native (pruebas)
 ├── partitions_8mb.csv      # 3 MB por app ×2 (OTA), 1.9 MB datos, 64 KB coredump
 ├── lib/radar_core/         # lógica pura en C++11, sin Arduino, 100 % probada
-│   ├── button.h            #   gestos corta / larga / muy larga + antirrebote
-│   ├── nav.h               #   pantallas y menú
+│   ├── button.h            #   gestos corta / larga / muy larga, antirrebote, vista previa
+│   ├── nav.h               #   pantallas, menú y textos de "si sueltas ahora"
 │   ├── net_list.h          #   lista de redes (sin memoria dinámica)
 │   ├── rssi_filter.h       #   mediana + Kalman
 │   ├── distance.h          #   modelo log-distancia + rango
@@ -117,7 +117,7 @@ radar-wifi/
 │   ├── main.cpp            #   loop: botón → navegación → radio → pantalla
 │   ├── scanner.cpp         #   barridos WiFi asíncronos con watchdog
 │   ├── sniffer.cpp         #   modo promiscuo: RSSI del router + equipos
-│   ├── ui.cpp              #   pantallas U8g2, cinta de ayuda, logo
+│   ├── ui.cpp              #   pantallas U8g2, panel "si sueltas ahora", logo
 │   └── logo.h              #   logo Hackwise (XBM 124×26)
 ├── test/test_core/         # pruebas Unity de lib/radar_core
 └── docs/

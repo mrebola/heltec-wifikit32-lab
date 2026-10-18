@@ -22,8 +22,10 @@ struct TrackView {
 void uiBegin();
 // Boot screen with the Hackwise logo.
 void uiSplash();
-// Draws one frame. `holdMs` drives the press-progress bar (0 = not held).
+// Draws one frame. `holdMs` drives the press-progress bar (0 = not held) and
+// `pending` the "what happens if you let go" panel.
 // `toast`, when not null, is drawn as a centered message over the screen.
 void uiDraw(const radar::Nav& nav, const radar::NetList& nets, bool scanning,
             const TrackView& track, bool outdoor, float rssiAt1m,
-            uint32_t holdMs, const char* toast, uint32_t now);
+            uint32_t holdMs, radar::Gesture pending, const char* toast,
+            uint32_t now);

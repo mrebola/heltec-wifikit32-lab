@@ -15,22 +15,25 @@ estimada y tendencia (acercando / alejando / estable).
 | Gesto | Duración | Acción |
 |---|---|---|
 | Corta | < 0.6 s | siguiente |
-| Larga | 0.6–2 s | aceptar |
-| Muy larga | ≥ 2 s | volver (se dispara al llegar a 2 s, sin esperar a soltar) |
+| Larga | 0.6–1.8 s | aceptar |
+| Muy larga | 1.8–3.0 s | volver |
+| (ciclo) | ≥ 3.0 s | se repite corta → larga → muy larga, 1.2 s cada una |
 
-Antirrebote de 25 ms. Mientras se mantiene, una barra muestra el progreso.
+Todo gesto se dispara **al soltar**; mantener nunca actúa solo.
+
+Antirrebote de 25 ms. Mientras se mantiene, una barra muestra el progreso y,
+desde 0.15 s, un panel dice qué hace soltar en ese instante (`Button::pending`
++ `gestureLabel`) y cuánto falta para el siguiente gesto.
 
 ## Pantallas
 - **Arranque**: logo de Hackwise durante 2 s.
 - **Lista**: escaneo de todos los canales; red, barras, dBm, canal. Ordenada por
-  RSSI, 4 filas. Corta = bajar, larga = rastrear, muy larga = re-escanear.
+  RSSI, 5 filas. Corta = bajar, larga = rastrear, muy larga = re-escanear.
 - **Rastreo**: escucha pasiva (modo promiscuo) del canal de la red fijada. Cada
   beacon del AP es una lectura de RSSI (se promedian cada 125 ms, ~8/s).
   Distancia con rango, tendencia, barra frío/caliente y equipos activos.
   Sin lecturas en 5 s → "Señal perdida" y barrido completo para encontrar el AP
   en otro canal. Larga = menú, muy larga = lista.
-- **Cinta de ayuda**: la fila de abajo muestra siempre, deslizándose, los
-  controles de la pantalla actual.
 - **Menú**: Calibrar a 1 m · Entorno (Interior/Exterior) · Volver.
   Se guarda en NVS (`Preferences`).
 

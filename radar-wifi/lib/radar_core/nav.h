@@ -11,7 +11,7 @@ enum class Action { None, Rescan, StartTrack, StopTrack, Calibrate, ToggleEnv };
 // Screen navigation driven by button gestures. Returns the side effect the
 // caller must perform; it never touches hardware itself.
 struct Nav {
-  static constexpr int kRows = 4;  // list rows that fit above the help ticker
+  static constexpr int kRows = 5;  // list rows that fit on the OLED
 
   Screen screen = Screen::List;
   int cursor = 0;  // selected row in the list
@@ -74,5 +74,29 @@ struct Nav {
     return Action::None;
   }
 };
+
+// Short description of what gesture `g` would do on the current screen.
+// Shown while the button is held, so the user knows when to let go.
+inline const char* gestureLabel(const Nav& nav, Gesture g, int listSize) {
+  if (g == Gesture::None) return "";
+  switch (nav.screen) {
+    case Screen::List:
+      if (g == Gesture::VeryLong) return "Re-escanear";
+      if (listSize <= 0) return "Nada";
+      return g == Gesture::Short ? "Bajar" : "Rastrear red";
+    case Screen::Track:
+      if (g == Gesture::Short) return "Nada";
+      return g == Gesture::Long ? "Abrir menú" : "Volver a la lista";
+    case Screen::Menu:
+      if (g == Gesture::Short) return "Siguiente opción";
+      if (g == Gesture::VeryLong) return "Volver";
+      switch (nav.menuItem()) {
+        case MenuItem::Calibrate: return "Calibrar a 1 m";
+        case MenuItem::Environment: return "Cambiar entorno";
+        default: return "Volver";
+      }
+  }
+  return "";
+}
 
 }  // namespace radar

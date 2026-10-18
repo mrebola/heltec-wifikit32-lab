@@ -19,11 +19,8 @@ const uint8_t* const kSmall = u8g2_font_6x10_tf;
 const uint8_t* const kTiny = u8g2_font_5x7_tf;
 const uint8_t* const kBig = u8g2_font_helvB14_tr;
 
-// Screen layout: content above, hold bar, then the scrolling help ticker.
-constexpr int kHoldY = 54;    // 2 px press-progress bar
-constexpr int kTickerY = 63;  // baseline of the help ticker
-constexpr int kTickerPxPerSec = 25;
-constexpr int kTickerGap = 24;
+constexpr int kHoldY = 62;  // 2 px press-progress bar on the bottom rows
+constexpr uint32_t kPreviewAfterMs = 150;  // quick taps don't flash the panel
 
 constexpr int kRssiMin = -95;  // empty bar
 constexpr int kRssiMax = -30;  // full bar
@@ -162,7 +159,8 @@ void drawTrack(const TrackView& v) {
   }
 
   // Cold-to-hot bar.
-  oled.drawBox(0, 50, level(v.rssi, 128), 2);
+  oled.drawFrame(0, 53, 128, 6);
+  oled.drawBox(1, 54, level(v.rssi, 126), 4);
 }
 
 void drawMenu(const Nav& nav, bool outdoor, float rssiAt1m) {
@@ -185,38 +183,39 @@ void drawMenu(const Nav& nav, bool outdoor, float rssiAt1m) {
   }
 }
 
-// Bar above the ticker while the button is held, with a notch at the Long
-// threshold; it is full at the VeryLong threshold.
+// Bar on the bottom rows while the button is held: it fills up until the
+// action on the panel changes, then starts again.
 void drawHold(uint32_t holdMs) {
   if (holdMs == 0) return;
-  const uint32_t full = Button::kVeryLongMs;
-  const int w = int(128 * (holdMs > full ? full : holdMs) / full);
-  oled.drawBox(0, kHoldY, w, 2);
-  oled.setDrawColor(2);  // XOR keeps the notch visible on top of the bar
-  oled.drawVLine(int(128 * Button::kLongMs / full), kHoldY, 2);
+  const uint32_t step = holdMs < Button::kLongMs ? Button::kLongMs : Button::kStepMs;
+  const uint32_t done = step - Button::msToNext(holdMs);
+  oled.setDrawColor(0);
+  oled.drawBox(0, kHoldY, 128, 2);
   oled.setDrawColor(1);
+  oled.drawBox(0, kHoldY, int(128 * done / step), 2);
 }
 
-const char* helpText(Screen s) {
-  switch (s) {
-    case Screen::List:
-      return "Corto: bajar  \xc2\xb7  Largo: rastrear red  \xc2\xb7  Muy largo (2 s): re-escanear";
-    case Screen::Track:
-      return "Largo: menú  \xc2\xb7  Muy largo (2 s): volver a la lista";
-    case Screen::Menu:
-      return "Corto: siguiente  \xc2\xb7  Largo: elegir  \xc2\xb7  Muy largo (2 s): volver";
-  }
-  return "";
-}
+// While the button is held: what releasing now does, and what comes next.
+void drawPreview(const Nav& nav, int listSize, Gesture pending, uint32_t holdMs) {
+  if (pending == Gesture::None || holdMs < kPreviewAfterMs) return;
+  const uint32_t toNext = Button::msToNext(holdMs);
+  const Gesture next = Button::gestureAt(holdMs + toNext);
 
-// Help text that scrolls forever along the bottom row.
-void drawTicker(Screen s, uint32_t now) {
-  const char* text = helpText(s);
+  oled.setDrawColor(0);
+  oled.drawBox(0, 19, 128, 35);
+  oled.setDrawColor(1);
+  oled.drawFrame(0, 19, 128, 35);
+
   oled.setFont(kTiny);
-  const int period = oled.getUTF8Width(text) + kTickerGap;
-  const int offset = int((uint64_t(now) * kTickerPxPerSec / 1000) % period);
-  oled.drawUTF8(-offset, kTickerY, text);
-  oled.drawUTF8(period - offset, kTickerY, text);
+  oled.drawUTF8(3, 27, "Si sueltas ahora:");
+  oled.setFont(kSmall);
+  oled.drawUTF8(3, 39, gestureLabel(nav, pending, listSize));
+
+  char line[48];
+  std::snprintf(line, sizeof(line), "+%.1fs: %s", toNext / 1000.0f,
+                gestureLabel(nav, next, listSize));
+  oled.setFont(kTiny);
+  oled.drawUTF8(3, 50, line);
 }
 
 void drawToast(const char* msg) {
@@ -248,15 +247,15 @@ void uiSplash() {
 
 void uiDraw(const Nav& nav, const NetList& nets, bool scanning,
             const TrackView& track, bool outdoor, float rssiAt1m,
-            uint32_t holdMs, const char* toast, uint32_t now) {
+            uint32_t holdMs, Gesture pending, const char* toast, uint32_t now) {
   oled.clearBuffer();
   switch (nav.screen) {
     case Screen::List: drawList(nav, nets, scanning, now); break;
     case Screen::Track: drawTrack(track); break;
     case Screen::Menu: drawMenu(nav, outdoor, rssiAt1m); break;
   }
+  drawPreview(nav, nets.size(), pending, holdMs);
   drawHold(holdMs);
-  drawTicker(nav.screen, now);
   if (toast) drawToast(toast);
   oled.sendBuffer();
 }

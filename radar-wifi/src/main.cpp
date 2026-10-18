@@ -220,7 +220,7 @@ void loop() {
                    trend.state(),
                    snifferActive() ? snifferClients(kClientWindowMs) : -1};
     uiDraw(nav, nets, scannerBusy() && !tracking(), view, outdoor, rssiAt1m,
-           button.heldMs(now), toast, now);
+           button.heldMs(now), button.pending(now), toast, now);
   }
   delay(5);
 }

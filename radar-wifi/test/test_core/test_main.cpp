@@ -287,16 +287,32 @@ void test_button_very_long_press() {
   TEST_ASSERT_EQUAL(Gesture::VeryLong, press(b, now, 2500));
 }
 
-void test_button_very_long_fires_while_held_and_only_once() {
+void test_button_nothing_fires_while_held() {
   Button b;
-  int count = 0;
-  for (uint32_t t = 0; t <= 4000; t += 5) {
-    if (b.update(true, t) == Gesture::VeryLong) count++;
+  for (uint32_t t = 0; t <= 6000; t += 5) {
+    TEST_ASSERT_EQUAL(Gesture::None, b.update(true, t));
   }
-  TEST_ASSERT_EQUAL(1, count);
-  for (uint32_t t = 4005; t <= 4200; t += 5) {
-    TEST_ASSERT_EQUAL(Gesture::None, b.update(false, t));
-  }
+}
+
+void test_button_actions_cycle_while_held() {
+  // Short, then Long -> VeryLong -> Short -> Long ... one step each.
+  TEST_ASSERT_EQUAL(Gesture::Short, Button::gestureAt(0));
+  TEST_ASSERT_EQUAL(Gesture::Long, Button::gestureAt(Button::kLongMs));
+  TEST_ASSERT_EQUAL(Gesture::VeryLong, Button::gestureAt(Button::kVeryLongMs));
+  TEST_ASSERT_EQUAL(Gesture::Short, Button::gestureAt(Button::kVeryLongMs + Button::kStepMs));
+  TEST_ASSERT_EQUAL(Gesture::Long, Button::gestureAt(Button::kVeryLongMs + 2 * Button::kStepMs));
+}
+
+void test_button_ms_to_next() {
+  TEST_ASSERT_EQUAL_UINT32(Button::kLongMs - 100, Button::msToNext(100));
+  TEST_ASSERT_EQUAL_UINT32(Button::kStepMs, Button::msToNext(Button::kLongMs));
+  TEST_ASSERT_EQUAL_UINT32(1, Button::msToNext(Button::kVeryLongMs - 1));
+}
+
+void test_button_release_after_full_cycle() {
+  Button b;
+  uint32_t now = 1000;
+  TEST_ASSERT_EQUAL(Gesture::Short, press(b, now, Button::kVeryLongMs + Button::kStepMs + 100));
 }
 
 void test_button_boundaries() {
@@ -326,6 +342,31 @@ void test_button_survives_millis_wrap() {
   TEST_ASSERT_EQUAL(Gesture::Long, press(b, now, 1000));
   now = 0xFFFFFFFFu - 1000;
   TEST_ASSERT_EQUAL(Gesture::VeryLong, press(b, now, 2500));
+}
+
+void test_button_pending_follows_hold_time() {
+  Button b;
+  TEST_ASSERT_EQUAL(Gesture::None, b.pending(0));
+  for (uint32_t t = 0; t <= 300; t += 5) b.update(true, t);
+  TEST_ASSERT_EQUAL(Gesture::Short, b.pending(300));
+  for (uint32_t t = 305; t <= Button::kVeryLongMs + 10; t += 5) b.update(true, t);
+  TEST_ASSERT_EQUAL(Gesture::VeryLong, b.pending(Button::kVeryLongMs + 10));
+}
+
+void test_button_pending_matches_release_result() {
+  // What pending() promises must be exactly what releasing produces.
+  for (uint32_t hold = 100; hold < 6000; hold += 50) {
+    Button b;
+    uint32_t t = 0;
+    for (; t <= hold; t += 5) b.update(true, t);
+    const Gesture promised = b.pending(t - 5);
+    Gesture got = Gesture::None;
+    for (uint32_t r = t; r <= t + 100; r += 5) {
+      const Gesture g = b.update(false, r);
+      if (g != Gesture::None) got = g;
+    }
+    TEST_ASSERT_EQUAL_MESSAGE(promised, got, "pending() disagrees with release");
+  }
 }
 
 void test_button_hold_progress() {
@@ -434,6 +475,36 @@ void test_nav_top_fills_screen_when_list_shrinks() {
   n.setCursor(16, 17);  // same AP moved up after a rescan
   TEST_ASSERT_EQUAL(16, n.cursor);
   TEST_ASSERT_EQUAL(17 - Nav::kRows, n.top);  // no empty rows at the bottom
+}
+
+void test_label_list() {
+  Nav n;
+  TEST_ASSERT_EQUAL_STRING("Bajar", gestureLabel(n, Gesture::Short, 3));
+  TEST_ASSERT_EQUAL_STRING("Rastrear red", gestureLabel(n, Gesture::Long, 3));
+  TEST_ASSERT_EQUAL_STRING("Re-escanear", gestureLabel(n, Gesture::VeryLong, 3));
+  TEST_ASSERT_EQUAL_STRING("Nada", gestureLabel(n, Gesture::Long, 0));
+}
+
+void test_label_track_and_menu() {
+  Nav n;
+  n.onGesture(Gesture::Long, 3);  // Track
+  TEST_ASSERT_EQUAL_STRING("Nada", gestureLabel(n, Gesture::Short, 3));
+  TEST_ASSERT_EQUAL_STRING("Abrir menú", gestureLabel(n, Gesture::Long, 3));
+  TEST_ASSERT_EQUAL_STRING("Volver a la lista", gestureLabel(n, Gesture::VeryLong, 3));
+
+  n.onGesture(Gesture::Long, 3);  // Menu, on Calibrate
+  TEST_ASSERT_EQUAL_STRING("Siguiente opción", gestureLabel(n, Gesture::Short, 3));
+  TEST_ASSERT_EQUAL_STRING("Calibrar a 1 m", gestureLabel(n, Gesture::Long, 3));
+  n.onGesture(Gesture::Short, 3);
+  TEST_ASSERT_EQUAL_STRING("Cambiar entorno", gestureLabel(n, Gesture::Long, 3));
+  n.onGesture(Gesture::Short, 3);
+  TEST_ASSERT_EQUAL_STRING("Volver", gestureLabel(n, Gesture::Long, 3));
+  TEST_ASSERT_EQUAL_STRING("Volver", gestureLabel(n, Gesture::VeryLong, 3));
+}
+
+void test_label_none_is_empty() {
+  Nav n;
+  TEST_ASSERT_EQUAL_STRING("", gestureLabel(n, Gesture::None, 3));
 }
 
 // ---------- Frames ----------
@@ -591,10 +662,15 @@ int main() {
   RUN_TEST(test_button_short_press);
   RUN_TEST(test_button_long_press);
   RUN_TEST(test_button_very_long_press);
-  RUN_TEST(test_button_very_long_fires_while_held_and_only_once);
+  RUN_TEST(test_button_nothing_fires_while_held);
+  RUN_TEST(test_button_actions_cycle_while_held);
+  RUN_TEST(test_button_ms_to_next);
+  RUN_TEST(test_button_release_after_full_cycle);
   RUN_TEST(test_button_boundaries);
   RUN_TEST(test_button_ignores_bounce);
   RUN_TEST(test_button_survives_millis_wrap);
+  RUN_TEST(test_button_pending_follows_hold_time);
+  RUN_TEST(test_button_pending_matches_release_result);
   RUN_TEST(test_button_hold_progress);
   RUN_TEST(test_nav_list_short_moves_cursor_and_wraps);
   RUN_TEST(test_nav_list_long_starts_tracking);
@@ -607,6 +683,9 @@ int main() {
   RUN_TEST(test_nav_scroll_keeps_cursor_visible);
   RUN_TEST(test_nav_clamps_cursor_when_list_shrinks);
   RUN_TEST(test_nav_top_fills_screen_when_list_shrinks);
+  RUN_TEST(test_label_list);
+  RUN_TEST(test_label_track_and_menu);
+  RUN_TEST(test_label_none_is_empty);
   RUN_TEST(test_sniffer_beacon_is_from_ap);
   RUN_TEST(test_sniffer_data_to_ap_gives_client);
   RUN_TEST(test_sniffer_data_from_ap_gives_client);

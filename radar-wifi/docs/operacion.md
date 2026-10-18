@@ -9,28 +9,37 @@ La placa tiene dos botones junto al conector USB:
 | **PRG** | Todo el control del radar |
 | **RST** | Reinicia la placa (vuelve al logo y a la lista; la calibración se conserva) |
 
-Con **PRG** hay tres gestos:
+Con **PRG** todo funciona igual: **mantienes, miras el panel y sueltas**.
 
-| Gesto | Cómo | Para qué |
+- Un **toque rápido** (menos de 0.6 s) hace la acción principal de la pantalla:
+  bajar en la lista, o pasar a la siguiente opción en el menú.
+- Si **mantienes**, aparece el panel **"Si sueltas ahora"**. Las acciones de la
+  pantalla van **rotando** en él, una cada 1.2 s, y vuelven a empezar. Al
+  soltar se ejecuta la que se ve en ese momento.
+- Mantener nunca dispara nada por sí solo. Si te pasaste, sigue apretando:
+  la acción que querías vuelve a salir.
+
+```
+┌────────────────────────────┐
+│Si sueltas ahora:           │
+│Rastrear red                │  ← lo que pasa si sueltas YA
+│+0.8s: Re-escanear          │  ← la siguiente, y en cuánto tiempo
+└────────────────────────────┘
+███████████░░░░░░░░░░░░░░░░░░░  ← se llena hasta el cambio de acción
+```
+
+El orden es siempre el mismo:
+
+| Mantienes | Si sueltas | Nombre en esta guía |
 |---|---|---|
-| **Corto** | pulsar y soltar (menos de 0.6 s) | siguiente opción |
-| **Largo** | mantener ~1 s y soltar | aceptar / entrar |
-| **Muy largo** | mantener 2 s | volver (actúa al llegar a 2 s, sin esperar a soltar) |
+| menos de 0.6 s | acción principal | **corto** |
+| 0.6 – 1.8 s | aceptar / entrar | **largo** |
+| 1.8 – 3.0 s | volver / acción secundaria | **muy largo** |
+| 3.0 s en adelante | se repite: corto → largo → muy largo… | |
 
-Mientras mantienes PRG, una **barra de progreso** crece sobre la cinta de
-ayuda:
-
-```
-  ███████|███████████░░░░░░░░░░░░░░░
-         ↑                         ↑
-   aquí empieza "Largo"     llena = "Muy largo"
-```
-
-Si sueltas antes de la marca es un **corto**. Si sueltas entre la marca y el
-final es un **largo**. Si la barra se llena, es un **muy largo**.
-
-La **última fila** de la pantalla muestra siempre, deslizándose, los controles
-de la pantalla en la que estás. Si dudas, léela.
+Las acciones dependen de la pantalla y, en el menú, de la opción seleccionada
+(por ejemplo "Calibrar a 1 m" o "Cambiar entorno"). No hace falta memorizar
+la tabla: el panel siempre dice qué va a pasar.
 
 ---
 
@@ -49,8 +58,7 @@ Después pasa a la lista.
 │ INFINITUM2A1  ▂▄▆   -63 11 │
 │ (oculta)      ▂▄    -71  1 │
 │ Totalplay-5   ▂     -84  6 │
-│                            │
-│Corto: bajar · Largo: rastre│  ← cinta de ayuda
+│ IZZI-4F2C     ▂     -88  1 │
 └────────────────────────────┘
    red           señal  dBm canal
 ```
@@ -74,7 +82,6 @@ Después pasa a la lista.
 │rango 2.7-4.4 m             │  ← margen probable
 │▲ ACERCANDO           4 disp│  ← tendencia y equipos activos
 │██████████████████░░░░░░░░░│  ← frío ◄──► caliente
-│Largo: menú · Muy largo (2 s│
 └────────────────────────────┘
 ```
 
@@ -108,7 +115,6 @@ Después pasa a la lista.
 │▓Calibrar 1 m (-40)        ▓│
 │ Entorno: Interior          │
 │ Volver                     │
-│Corto: siguiente · Largo: el│
 └────────────────────────────┘
 ```
 
