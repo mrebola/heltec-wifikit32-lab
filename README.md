@@ -76,7 +76,7 @@ Cada experimento vive en su propia carpeta.
 
 | Proyecto | Descripción |
 |---|---|
-| [`radar-wifi/`](radar-wifi/) | Radar WiFi: lista de redes por potencia, rastreo de una red con distancia estimada, tendencia (acercando/alejando) y equipos activos. Se maneja con el botón PRG. |
+| [`radar-wifi/`](radar-wifi/) | **Hackwise Scanner**: lista de redes por potencia, rastreo de una red con distancia estimada, tendencia (acercando/alejando) y equipos activos. [Guía de uso](radar-wifi/docs/operacion.md). |
 
 ```sh
 cd radar-wifi

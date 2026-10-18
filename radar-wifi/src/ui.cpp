@@ -68,13 +68,17 @@ void formatMeters(float m, char* out, size_t size) {
   else std::snprintf(out, size, "%.0f", m);
 }
 
-void drawList(const Nav& nav, const NetList& nets, bool scanning) {
+void drawList(const Nav& nav, const NetList& nets, bool scanning, uint32_t now) {
   char line[24];
   oled.setFont(kSmall);
-  std::snprintf(line, sizeof(line), "Redes WiFi (%d)", nets.size());
+  std::snprintf(line, sizeof(line), "Hackwise Scanner (%d)", nets.size());
   oled.drawStr(0, 8, line);
-  if (scanning) oled.drawStr(110, 8, "...");
   oled.drawHLine(0, 10, 128);
+  if (scanning) {  // a gap running along the underline: the title fills the row
+    oled.setDrawColor(0);
+    oled.drawHLine(int(now / 8 % 140) - 12, 10, 12);
+    oled.setDrawColor(1);
+  }
 
   if (nets.size() == 0) {
     oled.drawUTF8(0, 32, scanning ? "Escaneando..." : "Sin redes");
@@ -247,7 +251,7 @@ void uiDraw(const Nav& nav, const NetList& nets, bool scanning,
             uint32_t holdMs, const char* toast, uint32_t now) {
   oled.clearBuffer();
   switch (nav.screen) {
-    case Screen::List: drawList(nav, nets, scanning); break;
+    case Screen::List: drawList(nav, nets, scanning, now); break;
     case Screen::Track: drawTrack(track); break;
     case Screen::Menu: drawMenu(nav, outdoor, rssiAt1m); break;
   }
