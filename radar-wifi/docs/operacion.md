@@ -112,8 +112,8 @@ Después pasa a la lista.
 ┌────────────────────────────┐
 │Menú                        │
 │────────────────────────────│
-│▓Calibrar 1 m (-40)        ▓│
 │ Entorno: Interior          │
+│▓Deauth (lab)              ▓│
 │ Volver                     │
 └────────────────────────────┘
 ```
@@ -128,9 +128,42 @@ Después pasa a la lista.
 |---|---|
 | **Calibrar 1 m (−40)** | Guarda la potencia actual como "1 metro". El número entre paréntesis es el valor guardado. |
 | **Entorno: Interior / Exterior** | Cambia el modelo de distancia. Interior supone paredes y reflejos; exterior, campo abierto. |
+| **Deauth (lab)** | Abre la pantalla de deautenticación de la red rastreada. Solo para tu propio laboratorio. |
 | **Volver** | Regresa al rastreo. |
 
-Ambos ajustes se guardan y se conservan al apagar la placa.
+Ambos ajustes (calibración y entorno) se guardan y se conservan al apagar la
+placa.
+
+### 5. Deauth (lab)
+```
+┌────────────────────────────┐
+│Akbаl_lab               c6  │  ← la red rastreada y su canal
+│────────────────────────────│
+│ENVIANDO DEAUTH             │  ← parpadea mientras envía
+│1024 tramas  8s             │  ← tramas enviadas y cuánto lleva
+│disp: 3                     │  ← equipos que aún hablan con el router
+└────────────────────────────┘
+```
+
+- **Qué hace**: envía tramas de deautenticación en nombre del router
+  (suplanta su MAC): al broadcast y una dirigida a cada equipo visto en el
+  último minuto. Ráfagas cada 100 ms, **sin límite de tiempo: sigue hasta que
+  tú la pares**.
+- **"tramas"** crece rápido (~40/s): es el indicador de que está activo.
+- **"disp"** baja hacia 0 cuando funciona: los equipos dejan de hablar con el
+  router. Normalmente se reconectan en segundos al parar el ataque.
+- La escucha sigue corriendo por detrás: la potencia y el canal siguen vivos.
+- Los routers con PMF (802.11w) y sus clientes ignoran estas tramas.
+
+| Gesto | Acción |
+|---|---|
+| Largo | **iniciar** / **parar** |
+| Muy largo | parar y volver al rastreo |
+| Corto | nada |
+
+> **Solo en redes propias o con autorización expresa** (tu laboratorio, como
+> `akbal_lab`). Desasociar equipos de redes ajenas es ilegal en la mayoría de
+> jurisdicciones.
 
 ---
 
@@ -153,6 +186,16 @@ Hazlo una vez por router o tipo de router:
 4. Debe aparecer **"Calibrado a 1 m"**. Si aparece "Espera la señal", espera un
    poco más y repite.
 
+### Desasociar los equipos de tu laboratorio (deauth)
+1. Rastrea la red del lab y deja el rastreo activo unos segundos (así ya vio a
+   los equipos).
+2. **Largo** → menú → **corto** hasta *Deauth (lab)* → **largo** para entrar.
+3. **Largo** para iniciar. La línea **ENVIANDO DEAUTH** parpadea y "tramas"
+   corre. Sigue hasta que tú la pares — el router sigue emitiendo beacons,
+   así que "Señal perdida" no se activa.
+4. **Largo** de nuevo para parar, o **muy largo** para parar y volver.
+5. Verifica en un equipo del lab: su WiFi se cae y se reconecta al parar.
+
 ### Cambiar entre interior y exterior
 **Largo** → menú → **corto** hasta *Entorno* → **largo** para alternar →
 **muy largo** para volver.
@@ -172,4 +215,5 @@ Desde el rastreo: **muy largo**. Desde el menú: **muy largo** dos veces.
 | La distancia siempre está mal por el mismo factor | Calibra a 1 m, o cambia el entorno (interior/exterior). |
 | "Señal perdida" todo el tiempo | Estás fuera de alcance, o la antena está tapada. La antena es el zigzag del extremo de la placa: no la cubras con la mano. |
 | "disp" se queda en 0 | Nadie usa la red en este momento, o los equipos están dormidos. Espera un minuto. |
+| ENVIANDO pero nadie se desconecta | Puede pasar: routers con PMF (802.11w) hacen caso omiso de tramas falsificadas, y algunos clientes se reconectan en menos de un segundo. La trama se envía igual; cuéntalo como resultado del ejercicio. |
 | La pantalla no responde | Pulsa **RST**. |

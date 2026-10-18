@@ -168,11 +168,12 @@ void drawMenu(const Nav& nav, bool outdoor, float rssiAt1m) {
   oled.drawUTF8(0, 8, "Menú");
   oled.drawHLine(0, 10, 128);
 
-  char items[3][24];
+  char items[4][24];
   std::snprintf(items[0], sizeof(items[0]), "Calibrar 1 m (%.0f)", rssiAt1m);
   std::snprintf(items[1], sizeof(items[1]), "Entorno: %s", outdoor ? "Exterior" : "Interior");
-  std::snprintf(items[2], sizeof(items[2]), "Volver");
-  for (int i = 0; i < 3; i++) {
+  std::snprintf(items[2], sizeof(items[2]), "Deauth (lab)");
+  std::snprintf(items[3], sizeof(items[3]), "Volver");
+  for (int i = 0; i < 4; i++) {
     const int y = 22 + i * 12;
     if (i == nav.menu) {
       oled.drawBox(0, y - 9, 128, 12);
@@ -180,6 +181,31 @@ void drawMenu(const Nav& nav, bool outdoor, float rssiAt1m) {
     }
     oled.drawStr(2, y, items[i]);
     oled.setDrawColor(1);
+  }
+}
+
+void drawDeauth(const DeauthView& v, uint32_t now) {
+  char line[40];
+  char name[40];
+  oled.setFont(kSmall);
+  fitName(v.target->ssid, name, sizeof(name), 12);
+  oled.drawUTF8(0, 8, name);
+  std::snprintf(line, sizeof(line), "c%u", v.target->channel);
+  oled.drawStr(128 - oled.getStrWidth(line), 8, line);
+  oled.drawHLine(0, 10, 128);
+
+  // The status line blinks while frames are going out.
+  const bool blinkOff = v.running && now / 500 % 2 == 0;
+  if (!blinkOff) oled.drawUTF8(0, 26, v.running ? "ENVIANDO DEAUTH" : "Detenido");
+
+  oled.setFont(kTiny);
+  std::snprintf(line, sizeof(line), "%u tramas  %us",
+                static_cast<unsigned>(v.sent),
+                static_cast<unsigned>(v.elapsedMs / 1000));
+  oled.drawUTF8(0, 40, line);
+  if (v.clients >= 0) {
+    std::snprintf(line, sizeof(line), "disp: %d", v.clients);
+    oled.drawUTF8(0, 52, line);
   }
 }
 
@@ -196,7 +222,8 @@ void drawHold(uint32_t holdMs) {
 }
 
 // While the button is held: what releasing now does, and what comes next.
-void drawPreview(const Nav& nav, int listSize, Gesture pending, uint32_t holdMs) {
+void drawPreview(const Nav& nav, int listSize, Gesture pending, uint32_t holdMs,
+                 bool deauthRunning) {
   if (pending == Gesture::None || holdMs < kPreviewAfterMs) return;
   const uint32_t toNext = Button::msToNext(holdMs);
   const Gesture next = Button::gestureAt(holdMs + toNext);
@@ -209,11 +236,11 @@ void drawPreview(const Nav& nav, int listSize, Gesture pending, uint32_t holdMs)
   oled.setFont(kTiny);
   oled.drawUTF8(3, 27, "Si sueltas ahora:");
   oled.setFont(kSmall);
-  oled.drawUTF8(3, 39, gestureLabel(nav, pending, listSize));
+  oled.drawUTF8(3, 39, gestureLabel(nav, pending, listSize, deauthRunning));
 
   char line[48];
   std::snprintf(line, sizeof(line), "+%.1fs: %s", toNext / 1000.0f,
-                gestureLabel(nav, next, listSize));
+                gestureLabel(nav, next, listSize, deauthRunning));
   oled.setFont(kTiny);
   oled.drawUTF8(3, 50, line);
 }
@@ -246,15 +273,17 @@ void uiSplash() {
 }
 
 void uiDraw(const Nav& nav, const NetList& nets, bool scanning,
-            const TrackView& track, bool outdoor, float rssiAt1m,
-            uint32_t holdMs, Gesture pending, const char* toast, uint32_t now) {
+            const TrackView& track, const DeauthView& deauth, bool outdoor,
+            float rssiAt1m, uint32_t holdMs, Gesture pending, const char* toast,
+            uint32_t now) {
   oled.clearBuffer();
   switch (nav.screen) {
     case Screen::List: drawList(nav, nets, scanning, now); break;
     case Screen::Track: drawTrack(track); break;
     case Screen::Menu: drawMenu(nav, outdoor, rssiAt1m); break;
+    case Screen::Deauth: drawDeauth(deauth, now); break;
   }
-  drawPreview(nav, nets.size(), pending, holdMs);
+  drawPreview(nav, nets.size(), pending, holdMs, deauth.running);
   drawHold(holdMs);
   if (toast) drawToast(toast);
   oled.sendBuffer();

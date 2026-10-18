@@ -19,6 +19,15 @@ struct TrackView {
   int clients;  // stations heard recently, -1 while not listening
 };
 
+// What the deauth screen shows. Built by main.cpp each frame.
+struct DeauthView {
+  const radar::Network* target;
+  bool running;       // frames are being transmitted
+  uint32_t sent;      // frames sent since the run started
+  uint32_t elapsedMs; // frozen when stopped, so it shows how long it lasted
+  int clients;        // stations targeted, -1 while not listening
+};
+
 void uiBegin();
 // Boot screen with the Hackwise logo.
 void uiSplash();
@@ -26,6 +35,6 @@ void uiSplash();
 // `pending` the "what happens if you let go" panel.
 // `toast`, when not null, is drawn as a centered message over the screen.
 void uiDraw(const radar::Nav& nav, const radar::NetList& nets, bool scanning,
-            const TrackView& track, bool outdoor, float rssiAt1m,
-            uint32_t holdMs, radar::Gesture pending, const char* toast,
-            uint32_t now);
+            const TrackView& track, const DeauthView& deauth, bool outdoor,
+            float rssiAt1m, uint32_t holdMs, radar::Gesture pending,
+            const char* toast, uint32_t now);

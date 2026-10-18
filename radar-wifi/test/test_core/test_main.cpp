@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "button.h"
+#include "deauth.h"
 #include "distance.h"
 #include "frames.h"
 #include "nav.h"
@@ -424,8 +425,37 @@ void test_nav_menu_flow() {
   TEST_ASSERT_EQUAL(Screen::Menu, n.screen);  // stays to show the new value
 
   n.onGesture(Gesture::Short, 3);
+  TEST_ASSERT_EQUAL(MenuItem::Deauth, n.menuItem());
+  TEST_ASSERT_EQUAL(Action::None, n.onGesture(Gesture::Long, 3));
+  TEST_ASSERT_EQUAL(Screen::Deauth, n.screen);  // entering has no side effect
+
+  n.onGesture(Gesture::VeryLong, 3);
+  TEST_ASSERT_EQUAL(Screen::Track, n.screen);  // leaving stops the attack
+
+  n.onGesture(Gesture::Long, 3);  // reopening the menu starts at the top
+  TEST_ASSERT_EQUAL(MenuItem::Calibrate, n.menuItem());
+  n.onGesture(Gesture::Short, 3);
+  n.onGesture(Gesture::Short, 3);
+  n.onGesture(Gesture::Short, 3);
   TEST_ASSERT_EQUAL(MenuItem::Back, n.menuItem());
   TEST_ASSERT_EQUAL(Action::None, n.onGesture(Gesture::Long, 3));
+  TEST_ASSERT_EQUAL(Screen::Track, n.screen);
+}
+
+void test_nav_menu_deauth_opens_screen() {
+  Nav n;
+  n.onGesture(Gesture::Long, 3);   // Track
+  n.onGesture(Gesture::Long, 3);   // Menu, on Calibrate
+  n.onGesture(Gesture::Short, 3);  // Environment
+  n.onGesture(Gesture::Short, 3);  // Deauth
+  n.onGesture(Gesture::Long, 3);
+  TEST_ASSERT_EQUAL(Screen::Deauth, n.screen);
+  // On the Deauth screen: short does nothing, long toggles, very long exits.
+  TEST_ASSERT_EQUAL(Action::None, n.onGesture(Gesture::Short, 3));
+  TEST_ASSERT_EQUAL(Screen::Deauth, n.screen);
+  TEST_ASSERT_EQUAL(Action::ToggleDeauth, n.onGesture(Gesture::Long, 3));
+  TEST_ASSERT_EQUAL(Screen::Deauth, n.screen);
+  TEST_ASSERT_EQUAL(Action::StopDeauth, n.onGesture(Gesture::VeryLong, 3));
   TEST_ASSERT_EQUAL(Screen::Track, n.screen);
 }
 
@@ -498,8 +528,24 @@ void test_label_track_and_menu() {
   n.onGesture(Gesture::Short, 3);
   TEST_ASSERT_EQUAL_STRING("Cambiar entorno", gestureLabel(n, Gesture::Long, 3));
   n.onGesture(Gesture::Short, 3);
+  TEST_ASSERT_EQUAL_STRING("Abrir deauth", gestureLabel(n, Gesture::Long, 3));
+  n.onGesture(Gesture::Short, 3);
   TEST_ASSERT_EQUAL_STRING("Volver", gestureLabel(n, Gesture::Long, 3));
   TEST_ASSERT_EQUAL_STRING("Volver", gestureLabel(n, Gesture::VeryLong, 3));
+}
+
+void test_label_deauth_screen() {
+  Nav n;
+  n.onGesture(Gesture::Long, 3);   // Track
+  n.onGesture(Gesture::Long, 3);   // Menu, on Calibrate
+  n.onGesture(Gesture::Short, 3);  // Environment
+  n.onGesture(Gesture::Short, 3);  // Deauth
+  n.onGesture(Gesture::Long, 3);   // Deauth screen, not attacking yet
+  TEST_ASSERT_EQUAL_STRING("Nada", gestureLabel(n, Gesture::Short, 3));
+  TEST_ASSERT_EQUAL_STRING("Iniciar deauth", gestureLabel(n, Gesture::Long, 3));
+  TEST_ASSERT_EQUAL_STRING("Volver", gestureLabel(n, Gesture::VeryLong, 3));
+  TEST_ASSERT_EQUAL_STRING("Parar deauth", gestureLabel(n, Gesture::Long, 3, true));
+  TEST_ASSERT_EQUAL_STRING("Parar y volver", gestureLabel(n, Gesture::VeryLong, 3, true));
 }
 
 void test_label_none_is_empty() {
@@ -630,6 +676,128 @@ void test_clients_clear() {
   TEST_ASSERT_EQUAL(0, t.count(1000, 60000));
 }
 
+void test_clients_copy_alive_within_window() {
+  ClientTable t;
+  uint8_t a[6] = {2, 0, 0, 0, 0, 1}, b[6] = {2, 0, 0, 0, 0, 2}, c[6] = {2, 0, 0, 0, 0, 3};
+  t.seen(a, 1000);    // will be old by now
+  t.seen(b, 20000);
+  t.seen(c, 69000);
+  uint8_t out[4][6];
+  const int n = t.copyAlive(70000, 60000, out, 4);
+  TEST_ASSERT_EQUAL(2, n);
+  TEST_ASSERT_EQUAL_MEMORY(b, out[0], 6);
+  TEST_ASSERT_EQUAL_MEMORY(c, out[1], 6);
+}
+
+void test_clients_copy_alive_respects_max() {
+  ClientTable t;
+  uint8_t m[6] = {2, 0, 0, 0, 0, 0};
+  for (int i = 0; i < 4; i++) {
+    m[5] = static_cast<uint8_t>(i + 1);
+    t.seen(m, 1000 + i);
+  }
+  uint8_t out[2][6];
+  TEST_ASSERT_EQUAL(2, t.copyAlive(20000, 60000, out, 2));
+}
+
+// ---------- Deauth ----------
+
+void test_deauth_broadcast_frame_layout() {
+  uint8_t f[kDeauthLen];
+  buildDeauth(f, kAp, kBcast, 0, 7);
+  TEST_ASSERT_EQUAL_UINT8(0xC0, f[0]);  // management, subtype 12 (deauth)
+  TEST_ASSERT_EQUAL_UINT8(0x00, f[1]);
+  TEST_ASSERT_EQUAL_UINT8(0x00, f[2]);  // duration 0
+  TEST_ASSERT_EQUAL_UINT8(0x00, f[3]);
+  TEST_ASSERT_EQUAL_MEMORY(kBcast, f + 4, 6);  // DA
+  TEST_ASSERT_EQUAL_MEMORY(kAp, f + 10, 6);    // SA: the spoofed AP
+  TEST_ASSERT_EQUAL_MEMORY(kAp, f + 16, 6);    // BSSID
+  TEST_ASSERT_EQUAL_UINT8(0x07, f[24]);        // reason, little endian
+  TEST_ASSERT_EQUAL_UINT8(0x00, f[25]);
+}
+
+void test_deauth_frame_targets_client() {
+  uint8_t f[kDeauthLen];
+  buildDeauth(f, kAp, kSta, 0, 7);
+  TEST_ASSERT_EQUAL_MEMORY(kSta, f + 4, 6);
+  TEST_ASSERT_EQUAL_MEMORY(kAp, f + 10, 6);
+}
+
+void test_deauth_sequence_field() {
+  uint8_t f[kDeauthLen];
+  buildDeauth(f, kAp, kBcast, 0x123, 7);
+  TEST_ASSERT_EQUAL_UINT8(0x30, f[22]);  // fragment 0 + seq[3:0]
+  TEST_ASSERT_EQUAL_UINT8(0x12, f[23]);  // seq[11:4]
+}
+
+void test_deauth_sequence_wraps_at_4096() {
+  uint8_t f[kDeauthLen];
+  buildDeauth(f, kAp, kBcast, 0x1000, 7);  // sequence is only 12 bits
+  TEST_ASSERT_EQUAL_UINT8(0x00, f[22]);
+  TEST_ASSERT_EQUAL_UINT8(0x00, f[23]);
+}
+
+void test_deauth_run_starts_off() {
+  DeauthRun r;
+  TEST_ASSERT_FALSE(r.running());
+  TEST_ASSERT_EQUAL_UINT32(0, r.sent());
+}
+
+void test_deauth_run_burst_due_immediately() {
+  DeauthRun r;
+  r.start(1000);
+  TEST_ASSERT_TRUE(r.running());
+  TEST_ASSERT_TRUE(r.burstDue(1000));
+}
+
+void test_deauth_run_paces_bursts() {
+  DeauthRun r;
+  r.start(1000);
+  r.addSent(10, 1005);
+  TEST_ASSERT_FALSE(r.burstDue(1050));
+  TEST_ASSERT_TRUE(r.burstDue(1105));
+}
+
+void test_deauth_run_counts_sent() {
+  DeauthRun r;
+  r.start(1000);
+  r.addSent(10, 1005);
+  r.addSent(3, 1005);
+  TEST_ASSERT_EQUAL_UINT32(13, r.sent());
+}
+
+void test_deauth_run_elapsed_ms() {
+  DeauthRun r;
+  r.start(1000);
+  TEST_ASSERT_EQUAL_UINT32(0, r.elapsedMs(1000));
+  TEST_ASSERT_EQUAL_UINT32(500, r.elapsedMs(1500));
+}
+
+void test_deauth_run_stop_freezes_time_and_count() {
+  DeauthRun r;
+  r.start(1000);
+  r.addSent(10, 1050);
+  r.stop(2000);
+  TEST_ASSERT_FALSE(r.running());
+  TEST_ASSERT_FALSE(r.burstDue(9999));
+  TEST_ASSERT_EQUAL_UINT32(10, r.sent());
+  TEST_ASSERT_EQUAL_UINT32(1000, r.elapsedMs(9000));
+}
+
+void test_deauth_run_restart_resets_count() {
+  DeauthRun r;
+  r.start(1000);
+  r.addSent(10, 1005);
+  r.stop(1010);
+  r.start(5000);
+  TEST_ASSERT_TRUE(r.burstDue(5000));  // due immediately again
+  r.addSent(4, 5001);
+  TEST_ASSERT_FALSE(r.burstDue(5099));
+  TEST_ASSERT_TRUE(r.burstDue(5101));
+  TEST_ASSERT_EQUAL_UINT32(4, r.sent());
+  TEST_ASSERT_EQUAL_UINT32(500, r.elapsedMs(5500));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_filter_not_ready_before_first_sample);
@@ -680,11 +848,13 @@ int main() {
   RUN_TEST(test_nav_menu_flow);
   RUN_TEST(test_nav_menu_calibrate_returns_to_track);
   RUN_TEST(test_nav_menu_very_long_goes_back_to_track);
+  RUN_TEST(test_nav_menu_deauth_opens_screen);
   RUN_TEST(test_nav_scroll_keeps_cursor_visible);
   RUN_TEST(test_nav_clamps_cursor_when_list_shrinks);
   RUN_TEST(test_nav_top_fills_screen_when_list_shrinks);
   RUN_TEST(test_label_list);
   RUN_TEST(test_label_track_and_menu);
+  RUN_TEST(test_label_deauth_screen);
   RUN_TEST(test_label_none_is_empty);
   RUN_TEST(test_sniffer_beacon_is_from_ap);
   RUN_TEST(test_sniffer_data_to_ap_gives_client);
@@ -697,5 +867,18 @@ int main() {
   RUN_TEST(test_clients_full_replaces_oldest);
   RUN_TEST(test_clients_survive_millis_wrap);
   RUN_TEST(test_clients_clear);
+  RUN_TEST(test_clients_copy_alive_within_window);
+  RUN_TEST(test_clients_copy_alive_respects_max);
+  RUN_TEST(test_deauth_broadcast_frame_layout);
+  RUN_TEST(test_deauth_frame_targets_client);
+  RUN_TEST(test_deauth_sequence_field);
+  RUN_TEST(test_deauth_sequence_wraps_at_4096);
+  RUN_TEST(test_deauth_run_starts_off);
+  RUN_TEST(test_deauth_run_burst_due_immediately);
+  RUN_TEST(test_deauth_run_paces_bursts);
+  RUN_TEST(test_deauth_run_counts_sent);
+  RUN_TEST(test_deauth_run_elapsed_ms);
+  RUN_TEST(test_deauth_run_stop_freezes_time_and_count);
+  RUN_TEST(test_deauth_run_restart_resets_count);
   return UNITY_END();
 }

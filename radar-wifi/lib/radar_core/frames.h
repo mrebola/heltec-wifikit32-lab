@@ -89,6 +89,19 @@ class ClientTable {
     return false;
   }
 
+  // Copies the MACs alive within `windowMs` into `out` (up to `max` rows).
+  // Returns how many were copied.
+  int copyAlive(uint32_t now, uint32_t windowMs, uint8_t out[][6], int max) const {
+    int n = 0;
+    for (int i = 0; i < size_ && n < max; i++) {
+      if (now - last_[i] <= windowMs) {
+        std::memcpy(out[n], mac_[i], 6);
+        n++;
+      }
+    }
+    return n;
+  }
+
  private:
   uint8_t mac_[kCapacity][6] = {};
   uint32_t last_[kCapacity] = {};

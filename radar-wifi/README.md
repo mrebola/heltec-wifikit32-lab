@@ -9,6 +9,8 @@ de bolsillo:
 - Cuenta cuántos **equipos activos** hablan con ese router.
 - Se maneja con un solo botón (PRG): mientras lo mantienes, la pantalla rota
   las acciones posibles y dice qué pasará si sueltas en ese momento.
+- **Deauth (lab)**: ataque de deautenticación continuo contra la red rastreada,
+  hasta que tú lo pares. Solo para redes propias o con autorización.
 
 > Cómo usarlo paso a paso: **[docs/operacion.md](docs/operacion.md)**.
 > Especificación técnica y decisiones: [docs/design.md](docs/design.md).
@@ -70,6 +72,20 @@ intercambian datos o tramas de gestión con ese router en los últimos 60 s.
   una vez.
 - Úsalo en redes propias o con autorización.
 
+### 5. Deauth (lab)
+Desde el menú del rastreo: la placa transmite tramas de deautenticación
+**suplantando al router** (SA/BSSID = BSSID del AP) — al broadcast más una
+unicast por cada equipo visto en 60 s — en ráfagas cada 100 ms con número de
+secuencia único por trama. La trama (26 bytes, reason 7) la construye
+`buildDeauth()` en `lib/radar_core/deauth.h` y se transmite con
+`esp_wifi_80211_tx()`, que el core de Arduino ya enlaza.
+
+- **Corre hasta que tú lo pares**: Largo inicia/para; muy largo para y vuelve.
+- Se pausa solo durante un barrido; mientras corre, la escucha sigue activa.
+- Los equipos se reconectan al parar. Routers con PMF ignoran las tramas.
+- **Solo contra redes propias o con autorización:** desasociar equipos de
+  redes ajenas es ilegal en la mayoría de jurisdicciones.
+
 ## Construcción
 
 ### Hardware
@@ -90,7 +106,7 @@ brew install platformio
 ### Compilar, probar y grabar
 ```sh
 cd radar-wifi
-pio test -e native            # 65 pruebas de la lógica, corren en la Mac
+pio test -e native            # 80 pruebas de la lógica, corren en la Mac
 pio run -e heltec             # compilar
 pio run -e heltec -t upload   # grabar la placa
 pio device monitor            # ver el log serie (115200)
@@ -112,11 +128,13 @@ radar-wifi/
 │   ├── rssi_filter.h       #   mediana + Kalman
 │   ├── distance.h          #   modelo log-distancia + rango
 │   ├── trend.h             #   regresión + histéresis
+│   ├── deauth.h            #   trama deauth 802.11 + estado del run (lab)
 │   └── frames.h            #   lectura de cabeceras 802.11 + tabla de equipos
 ├── src/                    # capa de hardware
 │   ├── main.cpp            #   loop: botón → navegación → radio → pantalla
 │   ├── scanner.cpp         #   barridos WiFi asíncronos con watchdog
 │   ├── sniffer.cpp         #   modo promiscuo: RSSI del router + equipos
+│   ├── deauth_tx.cpp       #   TX de tramas forjadas (esp_wifi_80211_tx, lab)
 │   ├── ui.cpp              #   pantallas U8g2, panel "si sueltas ahora", logo
 │   └── logo.h              #   logo Hackwise (XBM 124×26)
 ├── test/test_core/         # pruebas Unity de lib/radar_core

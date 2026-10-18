@@ -4,9 +4,10 @@
 
 namespace radar {
 
-enum class Screen { List, Track, Menu };
-enum class MenuItem { Calibrate, Environment, Back, Count };
-enum class Action { None, Rescan, StartTrack, StopTrack, Calibrate, ToggleEnv };
+enum class Screen { List, Track, Menu, Deauth };
+enum class MenuItem { Calibrate, Environment, Deauth, Back, Count };
+enum class Action { None, Rescan, StartTrack, StopTrack, Calibrate, ToggleEnv,
+                    ToggleDeauth, StopDeauth };
 
 // Screen navigation driven by button gestures. Returns the side effect the
 // caller must perform; it never touches hardware itself.
@@ -64,10 +65,24 @@ struct Nav {
               return Action::Calibrate;
             case MenuItem::Environment:
               return Action::ToggleEnv;
+            case MenuItem::Deauth:
+              screen = Screen::Deauth;
+              break;  // entering the screen has no side effect
             default:
               screen = Screen::Track;
               break;
           }
+        }
+        break;
+
+      case Screen::Deauth:
+        // The attack runs until the user stops it: Long toggles, VeryLong
+        // stops it and returns to the tracking screen.
+        if (g == Gesture::Long) {
+          return Action::ToggleDeauth;
+        } else if (g == Gesture::VeryLong) {
+          screen = Screen::Track;
+          return Action::StopDeauth;
         }
         break;
     }
@@ -77,7 +92,9 @@ struct Nav {
 
 // Short description of what gesture `g` would do on the current screen.
 // Shown while the button is held, so the user knows when to let go.
-inline const char* gestureLabel(const Nav& nav, Gesture g, int listSize) {
+// `deauthRunning` only changes the wording while on the Deauth screen.
+inline const char* gestureLabel(const Nav& nav, Gesture g, int listSize,
+                                bool deauthRunning = false) {
   if (g == Gesture::None) return "";
   switch (nav.screen) {
     case Screen::List:
@@ -87,12 +104,17 @@ inline const char* gestureLabel(const Nav& nav, Gesture g, int listSize) {
     case Screen::Track:
       if (g == Gesture::Short) return "Nada";
       return g == Gesture::Long ? "Abrir menú" : "Volver a la lista";
+    case Screen::Deauth:
+      if (g == Gesture::Short) return "Nada";
+      if (g == Gesture::Long) return deauthRunning ? "Parar deauth" : "Iniciar deauth";
+      return deauthRunning ? "Parar y volver" : "Volver";
     case Screen::Menu:
       if (g == Gesture::Short) return "Siguiente opción";
       if (g == Gesture::VeryLong) return "Volver";
       switch (nav.menuItem()) {
         case MenuItem::Calibrate: return "Calibrar a 1 m";
         case MenuItem::Environment: return "Cambiar entorno";
+        case MenuItem::Deauth: return "Abrir deauth";
         default: return "Volver";
       }
   }

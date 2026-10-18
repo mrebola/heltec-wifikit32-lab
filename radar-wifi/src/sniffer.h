@@ -19,3 +19,6 @@ bool snifferActive();
 bool snifferTakeRssi(float& rssi);
 // Stations heard in the last `windowMs`.
 int snifferClients(uint32_t windowMs);
+// Copies the MACs of stations alive within `windowMs` into `out` (up to `max`
+// rows). Returns how many were copied.
+int snifferCopyClients(uint8_t out[][6], int max, uint32_t windowMs);

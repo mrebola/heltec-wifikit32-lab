@@ -35,7 +35,7 @@ router, más un conteo de equipos activos.
 
 Comandos clave (desde `radar-wifi/`):
 ```sh
-pio test -e native            # 65 pruebas de lógica en la Mac
+pio test -e native            # 80 pruebas de lógica en la Mac
 pio run -e heltec             # compilar firmware
 pio run -e heltec -t upload   # grabar la placa
 pio device monitor            # log serie (115200)
@@ -54,12 +54,14 @@ radar-wifi/
 │   ├── button.h      Gestos del botón. Se disparan AL SOLTAR. Mantener rota
 │   │                 acciones: Short (<0.6s) → Long → VeryLong, 1.2s cada una,
 │   │                 y se repite. gestureAt()/msToNext()/pending() son puros.
-│   ├── nav.h         Pantallas (List/Track/Menu), menú, y gestureLabel() con
-│   │                 el texto de "si sueltas ahora".
+│   ├── nav.h         Pantallas (List/Track/Menu/Deauth), menú, y
+│   │                 gestureLabel() con el texto de "si sueltas ahora".
 │   ├── net_list.h    Lista de redes, sin memoria dinámica, merge por BSSID.
 │   ├── rssi_filter.h Mediana de 5 + Kalman 1D sobre RSSI. samples()/sigma().
 │   ├── distance.h    Modelo log-distancia d=10^((A-RSSI)/(10n)) + rango.
 │   ├── trend.h       Regresión lineal 3s + histéresis → Approaching/Receding/Stable.
+│   ├── deauth.h      Trama deauth 802.11 (26 B) + estado del run. Solo para el
+│   │                 lab del usuario: redes propias o autorizadas.
 │   └── frames.h      parseFrame() lee cabeceras 802.11; ClientTable cuenta MACs.
 ├── src/
 │   ├── main.cpp      loop: botón → nav → radio → pantalla. La radio hace UNA
@@ -70,7 +72,9 @@ radar-wifi/
 │   │                 Tiene watchdog que reinicia WiFi si no llega SCAN_DONE.
 │   ├── sniffer.cpp   Modo promiscuo: promedia RSSI del AP y cuenta equipos.
 │   │                 Callback corre en la tarea WiFi; datos protegidos con portMUX.
-│   ├── ui.cpp        Dibujo U8g2: lista, rastreo, menú, panel "si sueltas ahora",
+│   ├── deauth_tx.cpp TX de tramas deauth forjadas con esp_wifi_80211_tx()
+│   │                 (lab: redes propias o autorizadas).
+│   ├── ui.cpp        Dibujo U8g2: lista, rastreo, menú, deauth, panel "si
 │   │                 barra de progreso, logo de arranque. 128×64, 1 bit.
 │   └── logo.h        Logo Hackwise como XBM 124×26 (generado de logo-dark.svg).
 └── docs/
@@ -98,7 +102,7 @@ que quieras. Mantener nunca dispara nada solo. No hay cinta de ayuda deslizante
 ## Estado
 - Todo en `main`, limpio, pusheado. Firmware grabado en la placa (~740 KB de
   3 MB por partición de app; tabla `partitions_8mb.csv` usa los 8 MB).
-- 65 pruebas en verde, compila sin warnings.
+- 80 pruebas en verde, compila sin warnings.
 - **Verificado en placa**: arranque, escaneo, estabilidad del escáner (bug de
   desfase corregido y confirmado), lecturas de rastreo por serie.
 - **Falta verificar con ojos humanos en la OLED**: logo, panel "si sueltas

@@ -82,3 +82,11 @@ int snifferClients(uint32_t windowMs) {
   portEXIT_CRITICAL(&lock);
   return n;
 }
+
+int snifferCopyClients(uint8_t out[][6], int max, uint32_t windowMs) {
+  const uint32_t now = millis();
+  portENTER_CRITICAL(&lock);
+  const int n = clients.copyAlive(now, windowMs, out, max);
+  portEXIT_CRITICAL(&lock);
+  return n;
+}
