@@ -56,11 +56,8 @@ La flash es de 8 MB, pero la tabla de fábrica solo usa los primeros 4 MB:
 | spiffs | 0x290000 | 1.44 MB |
 | *(sin usar)* | 0x400000 | 4 MB |
 
-Para usar los 8 MB en PlatformIO:
-
-```ini
-board_build.partitions = default_8MB.csv
-```
+Los proyectos de este repo usan `partitions_8mb.csv`, con los 8 MB completos:
+3 MB por app (×2 para OTA), ~1.9 MB de archivos y 64 KB de coredump.
 
 ## Conexión en macOS
 
@@ -75,4 +72,14 @@ esptool.py --port /dev/cu.usbserial-0001 flash_id
 
 ## Proyectos
 
-_Próximamente._ Cada experimento vivirá en su propia carpeta.
+Cada experimento vive en su propia carpeta.
+
+| Proyecto | Descripción |
+|---|---|
+| [`radar-wifi/`](radar-wifi/) | Radar WiFi: lista de redes por potencia, rastreo de una red con distancia estimada, tendencia (acercando/alejando) y equipos activos. Se maneja con el botón PRG. |
+
+```sh
+cd radar-wifi
+pio test -e native            # pruebas de la lógica en la Mac
+pio run -e heltec -t upload   # compilar y grabar
+```
