@@ -196,7 +196,15 @@ void drawDeauth(const DeauthView& v, uint32_t now) {
 
   // The status line blinks while frames are going out.
   const bool blinkOff = v.running && now / 500 % 2 == 0;
-  if (!blinkOff) oled.drawUTF8(0, 26, v.running ? "ENVIANDO DEAUTH" : "Detenido");
+  if (!blinkOff) {
+    if (v.err) {
+      std::snprintf(line, sizeof(line), "%s e=0x%X",
+                    v.running ? "ENVIANDO" : "Detenido", v.err);
+      oled.drawUTF8(0, 26, line);
+    } else {
+      oled.drawUTF8(0, 26, v.running ? "ENVIANDO DEAUTH" : "Detenido");
+    }
+  }
 
   oled.setFont(kTiny);
   std::snprintf(line, sizeof(line), "%u tramas  %us",
@@ -267,7 +275,7 @@ void uiSplash() {
   oled.clearBuffer();
   oled.drawXBMP((128 - kLogoW) / 2, 8, kLogoW, kLogoH, kLogo);
   oled.setFont(kSmall);
-  const char* title = "Radar WiFi";
+  const char* title = "Hackwise Scanner";
   oled.drawStr((128 - oled.getStrWidth(title)) / 2, 54, title);
   oled.sendBuffer();
 }

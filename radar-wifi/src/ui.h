@@ -26,6 +26,7 @@ struct DeauthView {
   uint32_t sent;      // frames sent since the run started
   uint32_t elapsedMs; // frozen when stopped, so it shows how long it lasted
   int clients;        // stations targeted, -1 while not listening
+  int err;            // ESP-IDF error of the last burst, 0 = ok
 };
 
 void uiBegin();

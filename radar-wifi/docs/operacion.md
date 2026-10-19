@@ -46,7 +46,7 @@ la tabla: el panel siempre dice qué va a pasar.
 ## Pantallas
 
 ### 1. Arranque
-Al encender aparece el logo de **hackwise** con "Radar WiFi" durante 2 s.
+Al encender aparece el logo de **hackwise** con "Hackwise Scanner" durante 2 s.
 Después pasa a la lista.
 
 ### 2. Lista de redes

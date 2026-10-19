@@ -28,7 +28,7 @@ void restartWifi() {
   esp_wifi_scan_stop();
   WiFi.mode(WIFI_OFF);
   delay(100);
-  WiFi.mode(WIFI_STA);
+  WiFi.mode(WIFI_AP_STA);  // AP block must exist for raw-frame TX (deauth)
   WiFi.scanComplete();
   WiFi.scanDelete();
   doneEvent = false;
@@ -40,7 +40,9 @@ void scannerBegin() {
   WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t) { doneEvent = true; },
                ARDUINO_EVENT_WIFI_SCAN_DONE);
   WiFi.persistent(false);  // never write WiFi config to flash
-  WiFi.mode(WIFI_STA);
+  // APSTA: the AP control block only exists to allow raw-frame TX (see
+  // deauth_tx.cpp); no SSID is ever configured, so it never beacons.
+  WiFi.mode(WIFI_AP_STA);
   WiFi.disconnect();
 }
 

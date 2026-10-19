@@ -67,10 +67,15 @@ certificación del usuario sobre su propia infraestructura.
   el FCS. La construye `buildDeauth()` en `lib/radar_core/deauth.h` (pura, con
   pruebas); el número de secuencia 802.11 avanza por trama (12 bits con
   envoltura) para que las estaciones no la descarten como duplicada.
-- **Transmisión**: `esp_wifi_80211_tx(WIFI_IF_STA, frame, len, false)` — API del
+- **Transmisión**: `esp_wifi_80211_tx(WIFI_IF_AP, frame, len, false)` — API del
   ESP-IDF que el core de Arduino ya enlaza; con `en_sys_seq = false` el core no
-  toca la trama más allá del FCS. Requiere el sniffer activo (reutiliza su modo
-  promiscuo y su canal) y **se pausa durante un barrido**.
+  toca la trama más allá del FCS. **OJO**: la interfaz STA rechaza tramas deauth
+  con `ESP_ERR_INVALID_ARG` (verificado en placa: el ESP-IDF 4.4 solo acepta ahí
+  beacon/probe/action/datos sin-QoS); por eso el TX va por la **interfaz AP**,
+  que no hace ese chequeo (mismo camino que usa ESP32 Marauder). El WiFi corre
+  en modo `AP_STA` — el bloque AP existe solo para habilitar esa tubería, nunca
+  anuncia SSID. Requiere el sniffer activo (reutiliza su canal) y **se pausa
+  durante un barrido**.
 - **Ritmo**: ráfaga cada 100 ms (`DeauthRun::kBurstMs`): 4 broadcast a
   ff:ff:ff:ff:ff:ff + 1 unicast por cada cliente vivo de la tabla de 60 s,
   tomadas con `snifferCopyClients()` bajo `portMUX`.
