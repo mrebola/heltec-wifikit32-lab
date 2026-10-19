@@ -40,10 +40,20 @@ void scannerBegin() {
   WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t) { doneEvent = true; },
                ARDUINO_EVENT_WIFI_SCAN_DONE);
   WiFi.persistent(false);  // never write WiFi config to flash
-  // APSTA: the AP control block only exists to allow raw-frame TX (see
-  // deauth_tx.cpp); no SSID is ever configured, so it never beacons.
+  // APSTA + a configured hidden softAP: raw-frame TX needs an AP interface
+  // that is started and configured, otherwise esp_wifi_80211_tx accepts the
+  // frame but it never reaches the air (verified on hardware). Same setup as
+  // ESP32 Marauder's attack mode: empty hidden SSID, beacon every 10 s.
   WiFi.mode(WIFI_AP_STA);
   WiFi.disconnect();
+  wifi_config_t apConf = {};
+  apConf.ap.ssid_hidden = 1;
+  apConf.ap.beacon_interval = 10000;
+  apConf.ap.ssid_len = 0;
+  apConf.ap.channel = 1;
+  apConf.ap.authmode = WIFI_AUTH_OPEN;
+  apConf.ap.max_connection = 1;
+  esp_wifi_set_config(WIFI_IF_AP, &apConf);
 }
 
 bool scannerBusy() { return running; }

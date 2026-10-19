@@ -30,8 +30,12 @@ router, más un conteo de equipos activos.
 ## Entorno de desarrollo
 - **PlatformIO** (instalado con `brew install platformio`, binario en `pio`).
 - No hay `arduino-cli` ni `esptool` global; esptool se usó en un venv temporal.
-- Core arduino-esp32 **2.0.17**, que es **C++11** en la placa (no uses
-  `std::clamp` ni C++14+ en `lib/radar_core`; el env `native` ya fuerza C++11).
+- Core arduino-esp32 **2.0.7** (`platform = espressif32@6.1.0`, ESP-IDF 4.4.4;
+  se bajó de 2.0.17/4.4.7 intentando destrabar el deauth, ver abajo). Es
+  **C++11** en la placa (no uses `std::clamp` ni C++14+ en `lib/radar_core`;
+  el env `native` ya fuerza C++11).
+- **Subida a 115200 baudios** (`upload_speed`): el USB de esta máquina es
+  inestable y a 460800 falla en el stub. Hubo brownouts al escanear.
 
 Comandos clave (desde `radar-wifi/`):
 ```sh
@@ -107,6 +111,23 @@ que quieras. Mantener nunca dispara nada solo. No hay cinta de ayuda deslizante
   desfase corregido y confirmado), lecturas de rastreo por serie.
 - **Falta verificar con ojos humanos en la OLED**: logo, panel "si sueltas
   ahora", conteo de equipos, y la prueba física de caminar hacia el router.
+
+## Prueba deauth 18-oct-2026 (contra alma_lab, red propia)
+- **El deauth NO funciona todavía.** En IDF 4.4.7 y en 4.4.4 la librería wifi
+  rechaza TODA trama deauth: `esp_wifi_80211_tx(WIFI_IF_AP, ...)` devuelve
+  `ESP_ERR_INVALID_ARG (0x102)` y loguea `wifi:unsupport frame type: 0c0`.
+  Resultado del ataque: 0 tramas al aire en ~1,900 ráfagas (verificado por
+  serie y por el log WiFi de la Mac: nunca se desasoció). El comentario viejo
+  de `deauth_tx.cpp` ("la interfaz AP no valida") es falso en estos cores.
+- `pio device monitor` exige TTY. Para capturar serie en background:
+  `sercap.py` con el python de brew de PlatformIO
+  (`/opt/homebrew/Cellar/platformio/*/libexec/bin/python3`, trae pyserial).
+- En el árbol hay un cambio **sin compilar ni probar**: `deauthTxCloneApMac()`
+  / `deauthTxRestoreApMac()` (clonar la MAC del AP objetivo al softAP antes de
+  transmitir, patrón de ESP32 Marauder para pasar la validación de origen) +
+  comentario nuevo en `deauth_tx.cpp`. Falta: llamarlo desde main.cpp al
+  iniciar/parar el run, recompilar, grabar y repetir la prueba. Si sigue
+  0x102: probar `espressif32@6.0.1` (IDF 4.4.2) y luego dar la vía por muerta.
 
 ## Ideas pendientes / próximos pasos sugeridos
 - Indicador de batería en la OLED (la V2 lee el nivel por un pin analógico;

@@ -11,3 +11,9 @@
 // ESP_OK (0) when the driver accepted it, or the ESP-IDF error code.
 int deauthTxSend(const uint8_t bssid[6], const uint8_t dest[6], uint16_t seq,
                  uint16_t reason);
+
+// Clones the target AP's MAC onto the hidden softAP so injected frames use
+// the interface's own source address (driver rejects spoofed SAs). Call
+// before starting a run, and deauthTxRestoreApMac() after stopping it.
+void deauthTxCloneApMac(const uint8_t bssid[6]);
+void deauthTxRestoreApMac();
